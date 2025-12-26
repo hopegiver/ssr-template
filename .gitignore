@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Wrangler
+.wrangler/
+.mf/
+
+# Environment variables
+.dev.vars
+.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
