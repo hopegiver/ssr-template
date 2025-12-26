@@ -4,6 +4,7 @@ import { Liquid } from 'liquidjs';
 const liquid = new Liquid({
   strictFilters: false, // 존재하지 않는 변수에 대해 엄격하지 않게 처리
   strictVariables: false,
+  outputEscape: 'escape', // XSS 방지: 모든 출력을 자동으로 HTML 이스케이프
 });
 
 // 템플릿 렌더링 함수

@@ -218,8 +218,11 @@ export class Form {
             alert.className = 'alert alert-danger';
 
             if (result.errors) {
-              const errorMessages = Object.values(result.errors).join('<br>');
-              alert.innerHTML = errorMessages;
+              // XSS 방지: textContent 사용하여 HTML 이스케이프
+              const errorMessages = Object.values(result.errors).join('\\n');
+              alert.textContent = errorMessages;
+              // 줄바꿈을 위해 white-space 스타일 적용
+              alert.style.whiteSpace = 'pre-line';
             } else {
               alert.textContent = result.message || '오류가 발생했습니다.';
             }
