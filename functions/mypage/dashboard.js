@@ -1,5 +1,5 @@
-import { layout } from '../templates/layout/main.js';
-import { body } from '../templates/mypage/dashboard.js';
+import { layout } from '../_templates/layout/main.js';
+import { body } from '../_templates/mypage/dashboard.js';
 
 // GET 요청 - 대시보드 페이지
 // 미들웨어에서 이미 인증 체크했으므로 바로 렌더링

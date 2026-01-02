@@ -31,11 +31,17 @@ ssr-template/
 │   ├── mypage/             # 인증 필요 페이지
 │   │   ├── _middleware.js  # 인증 체크 미들웨어
 │   │   └── dashboard.js    # 대시보드 (/mypage/dashboard)
-│   ├── lib/                # 라이브러리
+│   ├── _lib/               # 라이브러리 (비공개)
 │   │   ├── template.js     # 템플릿 렌더링
 │   │   ├── form.js         # 폼 검증
-│   │   └── auth.js         # JWT 인증
-│   └── templates/          # 템플릿 파일
+│   │   ├── query.js        # 쿼리 파라미터
+│   │   ├── auth.js         # JWT 인증
+│   │   ├── database.js     # 데이터베이스
+│   │   └── utils.js        # 유틸리티
+│   ├── _services/          # 서비스 레이어 (비공개)
+│   │   ├── UserDao.js      # 사용자 DAO
+│   │   └── AuthDao.js      # 인증 DAO
+│   └── _templates/         # 템플릿 파일 (비공개)
 │       ├── layout/
 │       │   └── main.js     # 메인 레이아웃
 │       ├── main/
@@ -150,7 +156,7 @@ export async function onRequestGet(context) {
 ### 기본 사용법
 
 ```javascript
-import { Form } from './lib/form.js';
+import { Form } from './_lib/form.js';
 
 export async function onRequestPost(context) {
   const form = new Form('myForm');
@@ -225,7 +231,7 @@ if (file) {
 ### 기본 사용법
 
 ```javascript
-import { Query } from './lib/query.js';
+import { Query } from './_lib/query.js';
 
 export async function onRequestGet(context) {
   const query = new Query(context);
@@ -287,7 +293,7 @@ const items = await db.all(
 **1. 로그인 처리**:
 
 ```javascript
-import { Auth } from '../lib/auth.js';
+import { Auth } from '../_lib/auth.js';
 
 export async function onRequestPost(context) {
   const formData = await context.request.formData();
@@ -325,7 +331,7 @@ export async function onRequestPost(context) {
 **2. 로그아웃**:
 
 ```javascript
-import { Auth } from '../lib/auth.js';
+import { Auth } from '../_lib/auth.js';
 
 export async function onRequestGet(context) {
   const auth = new Auth(context);
@@ -380,8 +386,8 @@ export async function onRequestGet(context) {
 **`functions/_middleware.js`** - 모든 요청에 적용:
 
 ```javascript
-import { Auth } from './lib/auth.js';
-import { renderPage as _renderPage, renderJSON as _renderJSON } from './lib/template.js';
+import { Auth } from './_lib/auth.js';
+import { renderPage as _renderPage, renderJSON as _renderJSON } from './_lib/template.js';
 
 export async function onRequest(context) {
   console.log('[Middleware] Global middleware executed');
@@ -743,7 +749,7 @@ export async function onRequestGet(context) {
 
 1. **파일 구조**:
    - 비슷한 기능은 같은 폴더에
-   - 공통 코드는 `lib/`에
+   - 공통 코드는 `_lib/`에 (언더스코어로 비공개 표시)
 
 2. **네이밍**:
    - 파일명 = URL 경로

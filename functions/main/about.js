@@ -1,5 +1,5 @@
-import { layout } from '../templates/layout/main.js';
-import { body } from '../templates/main/about.js';
+import { layout } from '../_templates/layout/main.js';
+import { body } from '../_templates/main/about.js';
 
 export async function onRequest(context) {
   const data = {

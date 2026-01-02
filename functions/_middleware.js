@@ -1,5 +1,5 @@
-import { Auth } from './lib/auth.js';
-import { renderPage as _renderPage, renderJSON as _renderJSON } from './lib/template.js';
+import { Auth } from './_lib/auth.js';
+import { renderPage as _renderPage, renderJSON as _renderJSON } from './_lib/template.js';
 
 /**
  * 글로벌 미들웨어

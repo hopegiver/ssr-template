@@ -1,4 +1,4 @@
-import { Database } from '../lib/database.js';
+import { Database } from '../_lib/database.js';
 
 /**
  * User DAO

@@ -1,6 +1,6 @@
-import { Form } from '../lib/form.js';
-import { layout } from '../templates/layout/main.js';
-import { body } from '../templates/main/contact.js';
+import { Form } from '../_lib/form.js';
+import { layout } from '../_templates/layout/main.js';
+import { body } from '../_templates/main/contact.js';
 
 // 폼 검증 규칙 설정 (GET/POST 공통)
 const form = new Form('contactForm');

@@ -1,4 +1,4 @@
-import { Auth } from '../lib/auth.js';
+import { Auth } from '../_lib/auth.js';
 
 // 로그아웃 처리
 export async function onRequestGet(context) {

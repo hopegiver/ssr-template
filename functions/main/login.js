@@ -1,7 +1,7 @@
-import { Auth } from '../lib/auth.js';
-import { Form } from '../lib/form.js';
-import { layout } from '../templates/layout/main.js';
-import { body } from '../templates/main/login.js';
+import { Auth } from '../_lib/auth.js';
+import { Form } from '../_lib/form.js';
+import { layout } from '../_templates/layout/main.js';
+import { body } from '../_templates/main/login.js';
 
 // 폼 검증 규칙
 const form = new Form('loginForm');
