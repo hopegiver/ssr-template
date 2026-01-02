@@ -2,11 +2,108 @@
  * Form - 폼 유효성 검사 및 자동 속성 적용
  */
 export class Form {
-  constructor(formId = 'form') {
+  constructor(formId = 'form1') {
     this.formId = formId;
     this.rules = {};
     this.data = {};
     this.errors = {};
+    this.formData = null; // SafeFormData instance
+  }
+
+  /**
+   * Context에서 FormData를 로드하고 SafeFormData로 래핑
+   * @param {Object} context - Cloudflare Pages context
+   */
+  async load(context) {
+    if (context.request.method === 'POST') {
+      const rawFormData = await context.request.formData();
+      this.formData = this._wrapFormData(rawFormData);
+    }
+    return this;
+  }
+
+  /**
+   * FormData를 SafeFormData로 래핑 (내부용)
+   */
+  _wrapFormData(rawFormData) {
+    return {
+      _formData: rawFormData,
+      get: (name, raw = false) => {
+        const value = rawFormData.get(name);
+        if (value === null || value === undefined) return null;
+        if (raw) return value;
+        return this._escapeHtml(String(value));
+      },
+      getAll: (name, raw = false) => {
+        const values = rawFormData.getAll(name);
+        if (raw) return values;
+        return values.map(v => this._escapeHtml(String(v)));
+      },
+      has: (name) => rawFormData.has(name),
+      toObject: (raw = false) => {
+        const obj = {};
+        for (const [key, value] of rawFormData.entries()) {
+          obj[key] = raw ? value : this._escapeHtml(String(value));
+        }
+        return obj;
+      },
+      _raw: rawFormData // 원본 접근용
+    };
+  }
+
+  /**
+   * HTML 이스케이프 (XSS 방지)
+   */
+  _escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return unsafe;
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  /**
+   * FormData에서 안전하게 값 가져오기
+   * @param {string} name - 필드명
+   * @param {boolean} raw - 이스케이프 하지 않을 경우 true (비밀번호 등)
+   */
+  get(name, raw = false) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    return this.formData.get(name, raw);
+  }
+
+  /**
+   * FormData에서 배열로 값 가져오기
+   */
+  getAll(name, raw = false) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    return this.formData.getAll(name, raw);
+  }
+
+  /**
+   * FormData 필드 존재 여부 확인
+   */
+  has(name) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    return this.formData.has(name);
+  }
+
+  /**
+   * FormData를 객체로 변환
+   */
+  toObject(raw = false) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    return this.formData.toObject(raw);
   }
 
   /**
@@ -29,15 +126,22 @@ export class Form {
 
   /**
    * 서버 측 검증
-   * @param {FormData} formData - 제출된 폼 데이터
+   * @param {FormData} formData - 제출된 폼 데이터 (선택적, load()를 사용했다면 생략 가능)
    * @returns {boolean} - 검증 통과 여부
    */
-  validate(formData) {
+  validate(formData = null) {
     this.errors = {};
     let isValid = true;
 
+    // formData 파라미터가 있으면 사용, 없으면 load()로 로드된 것 사용
+    const targetFormData = formData || this.formData?._raw;
+
+    if (!targetFormData) {
+      throw new Error('FormData가 제공되지 않았습니다. validate(formData) 또는 load(context)를 먼저 호출하세요.');
+    }
+
     for (const [fieldName, ruleList] of Object.entries(this.rules)) {
-      const value = formData.get(fieldName) || '';
+      const value = targetFormData.get(fieldName) || '';
 
       for (const rule of ruleList) {
         const error = this.validateRule(fieldName, value, rule);
