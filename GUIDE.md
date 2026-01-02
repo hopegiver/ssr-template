@@ -145,69 +145,50 @@ export async function onRequestGet(context) {
 
 ---
 
-## 폼 검증
+## 폼 검증 (Form 클래스)
 
-### Form 클래스 사용
-
-**1. 폼 규칙 정의**:
+### 기본 사용법
 
 ```javascript
 import { Form } from './lib/form.js';
 
-const form = new Form('myForm'); // 폼 ID
-form.setRules({
-  name: ['required', 'minLength:2', 'maxLength:50'],
-  email: ['required', 'email'],
-  age: ['required', 'min:18', 'max:100'],
-  phone: ['pattern:^01[0-9]{8,9}$']
-});
-```
-
-**2. GET - 폼 표시**:
-
-```javascript
-export async function onRequestGet(context) {
-  const data = {
-    title: 'Form Page',
-    formScript: form.getScript(true) // true = Ajax 사용
-  };
-
-  return context.data.renderPage(layout, body, data);
-}
-```
-
-**3. POST - 폼 검증**:
-
-```javascript
 export async function onRequestPost(context) {
-  const formData = await context.request.formData();
+  const form = new Form('myForm');
+  await form.load(context); // FormData 로드
 
-  // 서버 측 검증
-  if (!form.validate(formData)) {
-    const errors = form.getErrors();
-    return context.data.renderJSON({ success: false, errors }, 400);
+  form.setRules({
+    username: ['required', 'alphanumeric', 'minLength:3'],
+    email: ['required', 'email'],
+    password: ['required', 'minLength:8']
+  });
+
+  if (!form.validate()) {
+    return form.failResponse(); // 자동으로 400 JSON 응답
   }
 
-  // 검증 통과 후 처리
-  const name = formData.get('name');
-  // ...
+  // 안전하게 데이터 가져오기 (XSS 이스케이프 자동 적용)
+  const username = form.get('username');
+  const email = form.get('email');
+  const password = form.getRaw('password'); // 비밀번호는 raw (해싱용)
 
+  // 특정 필드만 추출
+  const userData = form.only('username', 'email');
+
+  // 데이터 처리...
   return context.data.renderJSON({ success: true });
 }
 ```
 
-**4. 템플릿에 스크립트 추가**:
+### 주요 메소드
 
-```html
-<form id="myForm" method="POST" class="needs-validation" novalidate>
-  <input type="text" name="name" class="form-control">
-  <input type="email" name="email" class="form-control">
-  <button type="submit">전송</button>
-</form>
-{{ formScript }}
-```
-
-**💡 팁**: 폼에 `action` 속성을 생략하면 현재 URL로 자동 제출됩니다. Ajax 모드에서는 Form 클래스가 자동으로 `Accept: application/json` 헤더를 전송하여 서버가 JSON 응답을 반환하도록 합니다.
+- `await form.load(context)` - FormData 로드
+- `form.get(name, defaultValue)` - 값 가져오기 (XSS 이스케이프)
+- `form.getRaw(name, defaultValue)` - 원본 값 (비밀번호, API 키 등)
+- `form.getFile(name)` - 파일 가져오기
+- `form.only(...fields)` - 특정 필드만 추출
+- `form.except(...fields)` - 특정 필드 제외
+- `form.validate()` - 검증 실행
+- `form.failResponse()` - 검증 실패 시 JSON 응답
 
 ### 검증 규칙
 
@@ -215,49 +196,87 @@ export async function onRequestPost(context) {
 |------|------|------|
 | `required` | 필수 입력 | `['required']` |
 | `email` | 이메일 형식 | `['email']` |
-| `minLength:N` | 최소 길이 | `['minLength:2']` |
+| `url` | URL 형식 | `['url']` |
+| `numeric` | 숫자만 | `['numeric']` |
+| `alpha` | 알파벳만 | `['alpha']` |
+| `alphanumeric` | 알파벳+숫자 | `['alphanumeric']` |
+| `minLength:N` | 최소 길이 | `['minLength:3']` |
 | `maxLength:N` | 최대 길이 | `['maxLength:50']` |
-| `min:N` | 최소 값 | `['min:18']` |
-| `max:N` | 최대 값 | `['max:100']` |
-| `pattern:regex` | 정규식 패턴 | `['pattern:^[0-9]+$']` |
+| `min:N` | 최소값 | `['min:18']` |
+| `max:N` | 최대값 | `['max:100']` |
+| `confirmed:field` | 필드 일치 확인 | `['confirmed:password_confirmation']` |
+| `in:a,b,c` | 허용 값 목록 | `['in:male,female,other']` |
+| `pattern:regex` | 정규식 패턴 | `['pattern:^010-\\d{4}-\\d{4}$']` |
 
-### Ajax vs 일반 폼
+### 파일 업로드
 
 ```javascript
-// Ajax 폼 (페이지 새로고침 없음)
-formScript: form.getScript(true)
-
-// 일반 폼 (HTML5 검증만)
-formScript: form.getScript(false)
-```
-
-### Form 클래스의 Ajax 처리
-
-Form 클래스의 `getScript(true)` 사용 시 자동으로 처리되는 내용:
-
-1. **자동 헤더 전송**:
-```javascript
-fetch(form.action || window.location.href, {
-  method: 'POST',
-  headers: {
-    'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest'  // 서버 감지용
-  },
-  body: formData
-});
-```
-
-2. **자동 리다이렉트**:
-```javascript
-const result = await response.json();
-if (result.success && result.redirect) {
-  window.location.href = result.redirect;  // 자동 페이지 이동
+const file = form.getFile('avatar');
+if (file) {
+  console.log(file.name, file.size, file.type);
+  // 파일 처리...
 }
 ```
 
-3. **서버에서 감지**:
-- `auth.login()`이 헤더를 확인하고 JSON 응답 반환
-- JSON에 `redirect` 필드가 있으면 클라이언트가 자동으로 페이지 이동
+---
+
+## 쿼리 파라미터 (Query 클래스)
+
+### 기본 사용법
+
+```javascript
+import { Query } from './lib/query.js';
+
+export async function onRequestGet(context) {
+  const query = new Query(context);
+
+  // 쿼리 파라미터 가져오기 (XSS 이스케이프 자동 적용)
+  const search = query.get('search');
+  const category = query.get('category', 'all'); // 기본값
+
+  // 숫자 변환
+  const page = parseInt(query.get('page', '1'));
+  const limit = parseInt(query.get('limit', '10'));
+
+  // 불리언 변환
+  const active = query.get('active') === 'true';
+
+  // 데이터 조회...
+}
+```
+
+### 주요 메소드
+
+- `query.get(name, defaultValue)` - 값 가져오기 (XSS 이스케이프)
+- `query.getRaw(name, defaultValue)` - 원본 값
+- `query.getAll(name)` - 배열로 가져오기 (예: `?tags=a&tags=b`)
+- `query.has(name)` - 존재 여부 확인
+- `query.only(...fields)` - 특정 파라미터만 추출
+- `query.except(...fields)` - 특정 파라미터 제외
+- `query.toObject()` - 객체로 변환
+
+### 페이지네이션 예시
+
+```javascript
+const page = Math.max(1, parseInt(query.get('page', '1')));
+const perPage = Math.max(1, Math.min(parseInt(query.get('per_page', '10')), 100));
+const offset = (page - 1) * perPage;
+
+const items = await db.all(
+  'SELECT * FROM items LIMIT ? OFFSET ?',
+  [perPage, offset]
+);
+```
+
+### Form vs Query
+
+| 기능 | Form | Query |
+|------|------|-------|
+| 데이터 소스 | POST FormData | GET Query String |
+| 초기화 | `await form.load(context)` | `new Query(context)` |
+| XSS 보호 | ✅ | ✅ |
+| 검증 | ✅ | ❌ |
+| 파일 업로드 | ✅ | ❌ |
 
 ---
 
