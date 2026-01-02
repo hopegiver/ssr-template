@@ -67,23 +67,63 @@ export class Form {
   /**
    * FormData에서 안전하게 값 가져오기
    * @param {string} name - 필드명
-   * @param {boolean} raw - 이스케이프 하지 않을 경우 true (비밀번호 등)
+   * @param {any} defaultValue - 값이 없을 경우 반환할 기본값
    */
-  get(name, raw = false) {
+  get(name, defaultValue = null) {
     if (!this.formData) {
       throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
     }
-    return this.formData.get(name, raw);
+    const value = this.formData.get(name, false);
+    return (value === null || value === undefined || value === '') ? defaultValue : value;
+  }
+
+  /**
+   * FormData에서 원본 값 가져오기 (XSS 이스케이프 없이)
+   * @param {string} name - 필드명
+   * @param {any} defaultValue - 값이 없을 경우 반환할 기본값
+   */
+  getRaw(name, defaultValue = null) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    const value = this.formData.get(name, true);
+    return (value === null || value === undefined || value === '') ? defaultValue : value;
   }
 
   /**
    * FormData에서 배열로 값 가져오기
    */
-  getAll(name, raw = false) {
+  getAll(name) {
     if (!this.formData) {
       throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
     }
-    return this.formData.getAll(name, raw);
+    return this.formData.getAll(name, false);
+  }
+
+  /**
+   * 파일 필드 가져오기
+   * @param {string} name - 파일 필드명
+   * @returns {File|null}
+   */
+  getFile(name) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    const file = this.formData._raw.get(name);
+    return (file instanceof File && file.size > 0) ? file : null;
+  }
+
+  /**
+   * 여러 파일 가져오기
+   * @param {string} name - 파일 필드명
+   * @returns {File[]}
+   */
+  getFiles(name) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    const files = this.formData._raw.getAll(name);
+    return files.filter(file => file instanceof File && file.size > 0);
   }
 
   /**
@@ -99,11 +139,60 @@ export class Form {
   /**
    * FormData를 객체로 변환
    */
-  toObject(raw = false) {
+  toObject() {
     if (!this.formData) {
       throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
     }
-    return this.formData.toObject(raw);
+    return this.formData.toObject(false);
+  }
+
+  /**
+   * 특정 필드만 가져오기 (XSS 이스케이프 적용)
+   * @param {...string} fields - 가져올 필드명들
+   */
+  only(...fields) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    const result = {};
+    fields.forEach(field => {
+      const value = this.formData.get(field, false);
+      if (value !== null && value !== undefined) {
+        result[field] = value;
+      }
+    });
+    return result;
+  }
+
+  /**
+   * 특정 필드만 가져오기 (원본, XSS 이스케이프 없이)
+   * @param {...string} fields - 가져올 필드명들
+   */
+  onlyRaw(...fields) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    const result = {};
+    fields.forEach(field => {
+      const value = this.formData.get(field, true);
+      if (value !== null && value !== undefined) {
+        result[field] = value;
+      }
+    });
+    return result;
+  }
+
+  /**
+   * 특정 필드 제외하고 가져오기 (XSS 이스케이프 적용)
+   * @param {...string} fields - 제외할 필드명들
+   */
+  except(...fields) {
+    if (!this.formData) {
+      throw new Error('FormData가 로드되지 않았습니다. load(context)를 먼저 호출하세요.');
+    }
+    const data = this.formData.toObject(false);
+    fields.forEach(field => delete data[field]);
+    return data;
   }
 
   /**
@@ -160,10 +249,12 @@ export class Form {
    * 개별 규칙 검증
    */
   validateRule(fieldName, value, rule) {
+    // required - 필수 입력
     if (rule === 'required' && !value.trim()) {
       return `${fieldName}은(는) 필수 항목입니다.`;
     }
 
+    // email - 이메일 형식
     if (rule === 'email' && value) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(value)) {
@@ -171,6 +262,46 @@ export class Form {
       }
     }
 
+    // url - URL 형식
+    if (rule === 'url' && value) {
+      try {
+        new URL(value);
+      } catch {
+        return '올바른 URL을 입력해주세요.';
+      }
+    }
+
+    // numeric - 숫자만
+    if (rule === 'numeric' && value) {
+      if (!/^\d+$/.test(value)) {
+        return '숫자만 입력 가능합니다.';
+      }
+    }
+
+    // alpha - 알파벳만
+    if (rule === 'alpha' && value) {
+      if (!/^[a-zA-Z]+$/.test(value)) {
+        return '알파벳만 입력 가능합니다.';
+      }
+    }
+
+    // alphanumeric - 알파벳+숫자만
+    if (rule === 'alphanumeric' && value) {
+      if (!/^[a-zA-Z0-9]+$/.test(value)) {
+        return '알파벳과 숫자만 입력 가능합니다.';
+      }
+    }
+
+    // confirmed - 확인 필드 일치 (예: password_confirmation)
+    if (rule.startsWith('confirmed:')) {
+      const confirmFieldName = rule.split(':')[1];
+      const confirmValue = this.formData?._raw.get(confirmFieldName) || '';
+      if (value !== confirmValue) {
+        return '입력한 값이 일치하지 않습니다.';
+      }
+    }
+
+    // minLength - 최소 길이
     if (rule.startsWith('minLength:')) {
       const minLength = parseInt(rule.split(':')[1]);
       if (value.length < minLength) {
@@ -178,6 +309,7 @@ export class Form {
       }
     }
 
+    // maxLength - 최대 길이
     if (rule.startsWith('maxLength:')) {
       const maxLength = parseInt(rule.split(':')[1]);
       if (value.length > maxLength) {
@@ -185,6 +317,7 @@ export class Form {
       }
     }
 
+    // min - 최소값
     if (rule.startsWith('min:')) {
       const min = parseFloat(rule.split(':')[1]);
       if (parseFloat(value) < min) {
@@ -192,6 +325,7 @@ export class Form {
       }
     }
 
+    // max - 최대값
     if (rule.startsWith('max:')) {
       const max = parseFloat(rule.split(':')[1]);
       if (parseFloat(value) > max) {
@@ -199,6 +333,15 @@ export class Form {
       }
     }
 
+    // in - 허용 값 목록
+    if (rule.startsWith('in:')) {
+      const allowedValues = rule.split(':')[1].split(',');
+      if (!allowedValues.includes(value)) {
+        return `허용된 값: ${allowedValues.join(', ')}`;
+      }
+    }
+
+    // pattern - 정규식 패턴
     if (rule.startsWith('pattern:')) {
       const pattern = rule.split(':')[1];
       const regex = new RegExp(pattern);
@@ -215,6 +358,21 @@ export class Form {
    */
   getErrors() {
     return this.errors;
+  }
+
+  /**
+   * 검증 실패 시 JSON 응답 생성
+   * @param {number} statusCode - HTTP 상태 코드 (기본값: 400)
+   * @returns {Response}
+   */
+  failResponse(statusCode = 400) {
+    return new Response(JSON.stringify({
+      success: false,
+      errors: this.errors
+    }), {
+      status: statusCode,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' }
+    });
   }
 
   /**
